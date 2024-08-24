@@ -1,30 +1,35 @@
 version: "3.9"
 services:
+#1
   zookeeper:
     image: docker.io/bitnami/zookeeper:3.8
     ports:
       - "2181:2181"
-    restart: unless-stopped
+    
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
     profiles:
       - infra
       - all
-
+#2
   kafka:
     image: devicehive/devicehive-kafka:${DH_TAG:-3.5.0}
     ports:
       - "9092:9092"
+      - "7071:7071"
     links:
       - "zookeeper"
-    restart: unless-stopped
     environment:
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
-      - KAFKA_CFG_LISTENERS=CLIENT://:9092
-      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
-      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - ALLOW_PLAINTEXT_LISTENER=yes
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CFG_LISTENERS: CLIENT://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: CLIENT://kafka:9092
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: CLIENT
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      ALLOW_PLAINTEXT_LISTENER: yes
+      KAFKA_OPTS: "${KAFKA_OPTS} -javaagent:/opt/kafka/jmx_prometheus_javaagent-0.3.0.jar=7071:/opt/kafka/kafka-0-8-2.yml"
+    volumes:
+      - ./lib/jmx_prometheus_javaagent-0.3.0.jar:/opt/kafka/jmx_prometheus_javaagent-0.3.0.jar:ro,z
+      - ./lib/kafka-0-8-2.yml:/opt/kafka/kafka-0-8-2.yml:ro,z
     healthcheck:
       test: /bin/nc -z localhost 9092
       interval: 2s
@@ -34,11 +39,12 @@ services:
       - infra
       - all
 
+#3
   postgres:
-    image: postgres:14.4
+    image: postgres:10
     ports:
       - "5432:5432"
-    restart: unless-stopped
+    
     environment:
       POSTGRES_USER: ${DH_POSTGRES_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DH_POSTGRES_PASSWORD:-mysecretpassword}
@@ -48,7 +54,31 @@ services:
     profiles:
       - infra
       - all
+#4
+  dh_backend_node:
+    image: devicehive/devicehive-backend-node:${DH_BACKEND_NODE_TAG:-development}
+    links:
+      - "postgres"
+      - "wsproxy"
+      - "hazelcast"
+    environment:
+      BACKEND.LOGGER_LEVEL: ${DH_BACKEND_NODE_LOGGER_LEVEL:-info}
+      PROXY.WS_PROXY_ENDPOINT: ws://wsproxy:3000
+      POSTGRES.HOST: ${DH_POSTGRES_ADDRESS:-postgres}
+      POSTGRES.PORT: ${DH_POSTGRES_PORT:-5432}
+      POSTGRES.USER: ${DH_POSTGRES_USERNAME:-postgres}
+      POSTGRES.PASSWORD: ${DH_POSTGRES_PASSWORD:-mysecretpassword}
+      POSTGRES.DATABASE: ${DH_POSTGRES_DB:-postgres}
+#5
+  hazelcast:
+    image: devicehive/devicehive-hazelcast:${DH_TAG:-3.5.0}
+    ports:
+      - "5701:5701"
+    environment:
+      MAX_HEAP_SIZE: "512m"
+      MIN_HEAP_SIZE: "512m"
 
+#6
   wsproxy:
     image: devicehive/devicehive-ws-proxy:${DH_WS_PROXY_TAG:-1.1.0}
     ports:
@@ -59,8 +89,6 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-
-    restart: unless-stopped
     environment:
       FRANZ.KAFKA_HOSTS: ${DH_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       PROXY.WEB_SOCKET_SERVER_HOST: 'wsproxy'
@@ -69,7 +97,7 @@ services:
     profiles:
       - infra
       - all
-
+#7
   wsproxy_external:
     image: devicehive/devicehive-ws-proxy:${DH_WS_PROXY_TAG:-1.1.0}
     ports:
@@ -78,7 +106,6 @@ services:
       - "kafka"
       - "dh_auth"
       - "dh_plugin"
-    restart: unless-stopped
     environment:
       FRANZ.KAFKA_HOSTS: ${DH_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       PLUGIN_MANAGER.AUTH_SERVICE_ENDPOINT: http://dh_auth:8090/auth/rest
@@ -88,7 +115,7 @@ services:
     profiles:
       - dev
       - all
-
+#8
   dh_plugin:
     image: devicehive/devicehive-plugin:${DH_TAG:-3.5.0}
     ports:
@@ -100,7 +127,6 @@ services:
       - "dh_frontend"
       - "dh_auth"
       - "wsproxy"
-    restart: unless-stopped
     environment:
       DH_ZK_ADDRESS: ${DH_ZK_ADDRESS:-zookeeper}
       DH_ZK_PORT: ${DH_ZK_PORT:-2181}
@@ -123,7 +149,7 @@ services:
     profiles:
       - front
       - all
-
+#9
   dh_frontend:
     image: devicehive/devicehive-frontend:${DH_TAG:-3.5.0}
     ports:
@@ -135,7 +161,6 @@ services:
       - "dh_backend"
       - "dh_auth"
       - "wsproxy"
-    restart: unless-stopped
     environment:
       DH_ZK_ADDRESS: ${DH_ZK_ADDRESS:-zookeeper}
       DH_ZK_PORT: ${DH_ZK_PORT:-2181}
@@ -157,7 +182,7 @@ services:
     profiles:
       - front
       - all
-
+#10
   dh_auth:
     image: devicehive/devicehive-auth:${DH_TAG:-3.5.0}
     ports:
@@ -168,7 +193,7 @@ services:
       - "wsproxy"
       - "zookeeper"
       - "dh_backend"
-    restart: unless-stopped
+    
     environment:
       DH_ZK_ADDRESS: ${DH_ZK_ADDRESS:-zookeeper}
       DH_ZK_PORT: ${DH_ZK_PORT:-2181}
@@ -188,7 +213,7 @@ services:
     profiles:
       - front
       - all
-
+#11
   redis_master:
     image: bitnami/redis:7.0
     ports:
@@ -196,12 +221,12 @@ services:
     volumes:
       - devicehive-redis:/bitnami
     environment:
-      - REDIS_REPLICATION_MODE=master
-      - ALLOW_EMPTY_PASSWORD=yes
+      REDIS_REPLICATION_MODE: master
+      ALLOW_EMPTY_PASSWORD: yes
     profiles:
       - infra
       - all
-
+#12
   redis_replica:
     image: bitnami/redis:7.0
     ports:
@@ -209,14 +234,14 @@ services:
     depends_on:
       - redis_master
     environment:
-      - REDIS_REPLICATION_MODE=slave
-      - REDIS_MASTER_HOST=redis_master
-      - REDIS_MASTER_PORT_NUMBER=6379
-      - ALLOW_EMPTY_PASSWORD=yes
+      REDIS_REPLICATION_MODE: slave
+      REDIS_MASTER_HOST: redis_master
+      REDIS_MASTER_PORT_NUMBER: 6379
+      ALLOW_EMPTY_PASSWORD: yes
     profiles:
       - infra
       - all
-
+#13
   dh_backend:
     image: devicehive/devicehive-backend:${DH_TAG:-3.5.0}
     links:
@@ -225,7 +250,7 @@ services:
       - "zookeeper"
       - "wsproxy"
       - "redis_master"
-    restart: unless-stopped
+    
     environment:
       DH_ZK_ADDRESS: ${DH_ZK_ADDRESS:-zookeeper}
       DH_ZK_PORT: ${DH_ZK_PORT:-2181}
@@ -246,20 +271,75 @@ services:
     profiles:
       - backend
       - all
-
+#14
   dh_proxy:
     image: devicehive/devicehive-proxy:${DH_PROXY_TAG:-3.5.0}
     links:
       - "dh_auth"
       - "dh_frontend"
       - "dh_plugin"
+      - "mqtt_broker1"
+      - "grafana"
     ports:
       - "80:8080"
-    restart: unless-stopped
+      - "1883:1883"
+      - "443:8443"
+    volumes:
+      - "./nginx-mqtt-brokers.conf:/etc/nginx/stream.d/nginx-mqtt-brokers.conf:ro,Z"
+      - "./grafana_location.conf:/etc/nginx/location.d/grafana.conf:ro,Z"
+      - "../../ssl/dhparam.pem:/etc/ssl/dhparam.pem:ro,Z"
+      - "../../ssl/ssl_certificate:/etc/ssl/ssl_certificate:ro,Z"
+      - "../../ssl/ssl_certificate_key:/etc/ssl/ssl_certificate_key:ro,Z"
     profiles:
       - dev
       - all
+#15
+  mqtt_broker1:
+    image: devicehive/devicehive-mqtt:1.1.0
+    links:
+      - dh_frontend
+      - redis
+    environment:
+      BROKER.WS_SERVER_URL: ws://dh_frontend:8080/api/websocket
+      BROKER.REDIS_SERVER_HOST: redis
+      BROKER.REDIS_SERVER_PORT: 6379
+      BROKER.ENABLE_PM: false
+#16
+  redis:
+    image: redis:alpine
 
+#17
+  grafana:
+    image: devicehive/devicehive-grafana:5.0.4-custom
+    links:
+      - "postgres"
+    
+    environment:
+      GF_USERS_ALLOW_SIGN_UP: "true"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_USERS_AUTO_ASSIGN_ORG: "false"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Admin
+      GF_ALERTING_ENABLED: "false"
+      GF_DEFAULT_INSTANCE_NAME: Grafana
+      GF_SERVER_ROOT_URL: "http://localhost/grafana"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - "./lib/monitoring/grafana-datasources-config.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro,Z"
+      - "./lib/monitoring/grafana-dashboards-config.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro,Z"
+      - "./lib/monitoring/devicehive-dashboard.json:/opt/grafana/dashboards/devicehive-dashboard.json:ro,Z"
+
+#28
+  node_app:
+    build: ./node_app
+    depends_on:
+      - mqtt_broker1
+      - postgres
+    environment:
+      POSTGRES_USER: ${DH_POSTGRES_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DH_POSTGRES_PASSWORD:-mysecretpassword}
+      POSTGRES_DB: ${DH_POSTGRES_DB:-postgres}
 volumes:
   devicehive-db:
   devicehive-redis:
+  grafana-data:
+  prometheus:

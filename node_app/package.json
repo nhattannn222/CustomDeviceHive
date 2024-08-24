@@ -1,0 +1,17 @@
+{
+    "name": "mqtt-to-postgres",
+    "version": "1.0.0",
+    "description": "Node.js app to read MQTT data and store in PostgreSQL",
+    "main": "index.js",
+    "dependencies": {
+        "axios": "^1.7.4",
+        "mqtt": "^4.2.8",
+        "node-fetch": "^3.3.2",
+        "pg": "^8.7.1"
+    },
+    "scripts": {
+        "start": "node index.js"
+    },
+    "author": "Tannnn",
+    "license": "MIT"
+}

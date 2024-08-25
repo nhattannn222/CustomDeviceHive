@@ -6,8 +6,8 @@ const { Client } = require('pg');
 async function fetchAccessToken() {
     try {
         const loginCredentials = {
-            login: 'backend',  // Replace with actual username
-            password: 'backend',  // Replace with actual password
+            login: 'backend',
+            password: 'backend',
         };
 
         const response = await axios.post('http://dh_auth:8090/auth/rest/token', loginCredentials, {
@@ -15,7 +15,6 @@ async function fetchAccessToken() {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'Origin': 'http://localhost',
-                // Include other headers if needed
             }
         });
 
@@ -48,25 +47,26 @@ async function getDevices(token) {
 }
 
 // Function to refresh device list
-let devices = [];  // Biến toàn cục để lưu danh sách thiết bị
+let devices = [];
+let token = null;
 
 async function refreshDeviceList() {
     try {
-        const token = await fetchAccessToken();
-        if (token) {
-            const listDevices = await getDevices(token);
-            if (listDevices && listDevices.length > 0) {
-                devices = listDevices;  // Cập nhật biến toàn cục
-            } else {
-                console.log('No devices found.');
-            }
+        if (!token) {
+            token = await fetchAccessToken();
+        }
+        const listDevices = await getDevices(token);
+        if (listDevices && listDevices.length > 0) {
+            devices = listDevices;
+        } else {
+            console.log('No devices found.');
         }
     } catch (error) {
         console.error('Error refreshing device list:', error.message);
     }
 }
 
-// Thiết lập để làm mới danh sách thiết bị mỗi 5 giây
+// Refresh the device list every 5 seconds
 setInterval(refreshDeviceList, 5000);
 
 // MQTT and PostgreSQL setup
@@ -75,16 +75,17 @@ const topic = 'sensor/data';
 
 const client = new Client({
     user: "login",
-    host: 'postgres',  // Tên service PostgreSQL trong Docker Compose
+    host: 'postgres',
     database: "devicehivedb",
     password: "pass",
-    port: 5432,  // Port PostgreSQL mặc định
+    port: 5432,
 });
 
 client.connect()
     .then(() => {
         console.log('Connected to PostgreSQL');
-        createTable();})
+        createTable();
+    })
     .catch(err => console.error('Connection error', err.stack));
 
 const createTable = async () => {
@@ -101,8 +102,6 @@ const createTable = async () => {
     await client.query(createTableQuery);
 };
 
-
-
 const mqttClient = mqtt.connect(mqttBrokerUrl);
 
 mqttClient.on('connect', () => {
@@ -116,26 +115,20 @@ mqttClient.on('connect', () => {
 
 mqttClient.on('message', async (topic, message) => {
     try {
-        // Phân tích dữ liệu tin nhắn
+        await refreshDeviceList();
+
         const payload = JSON.parse(message.toString());
         const { temperature, humidity, device_id } = payload;
-        
-        // Kiểm tra nếu devices là một mảng
+
         if (!Array.isArray(devices)) {
             console.error('Devices is not an array');
             return;
         }
 
-        // Tìm thiết bị trong danh sách
-        const device = devices.find(dev => dev.id === device_id); // Sửa thuộc tính để so sánh chính xác
-        console.log('Device Found:', device);
-
-        // Trả về id của device nếu tìm thấy, hoặc null nếu không tìm thấy
+        const device = devices.find(dev => dev.id === device_id);
         const deviceName = device ? device.name : null;
-        console.log('Device name:', deviceName);
 
         if (deviceName) {
-            // Chèn dữ liệu vào cơ sở dữ liệu PostgreSQL
             const query = 'INSERT INTO sensor_data (temperature, humidity, timestamp, device_name) VALUES ($1, $2, NOW(), $3)';
             await client.query(query, [temperature, humidity, deviceName]);
             console.log('Data inserted into PostgreSQL');

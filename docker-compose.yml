@@ -328,7 +328,7 @@ services:
       - "./lib/monitoring/grafana-dashboards-config.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro,Z"
       - "./lib/monitoring/devicehive-dashboard.json:/opt/grafana/dashboards/devicehive-dashboard.json:ro,Z"
 
-#28
+#18
   node_app:
     build: ./node_app
     depends_on:

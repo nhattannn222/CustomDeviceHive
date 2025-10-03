@@ -1,55 +1,99 @@
-Mô tả DeviveHive:
-  - DeviceHive là một Opensource Platform cho phép xây dựng hệ thống để quản lí các thiết bị IoT, cung cấp các API cho phép người sử dụng để xây dựng các thành phần tương tác với hệ thống.
-  - CustomDeviceHive là sản phẩm xây dựng dựa trên DeviceHive tích hợp thêm khả năng lưu trữ dữ liệu và hiển thị thông số "Temperature" và "Humidity" được thu thập từ mạch ESP8266 và sensor DHT11.
+# CustomDeviceHive
 
+## Introduction
 
-Mô tả hoạt động:
-1. Xây dựng hệ thống
-  - Để xây dựng hệ thống CustomDeviceHive, sử dụng câu lệnh:
-  -       docker-compose -f docker-compose.yml --profile all up -d
-  - Sau khi pull image và build thành công các containers, cần kiểm tra xem các containers đã hoạt động được chưa bằng cách vào xem logs của các containers như dh_frontend, dh_backend, dh_auth,...:
-  -     2024-08-25 12:11:30 2024-08-25 05:11:30.532 [main] INFO   c.d.a.DeviceHiveAuthApplication - Started DeviceHiveAuthApplication in 52.875 seconds (JVM running for 56.107)
-  -     2024-08-25 12:12:16 2024-08-25 05:12:16.594 [main] INFO   c.d.a.DeviceHiveFrontendApplication - Started DeviceHiveFrontendApplication in 20.922 seconds (JVM running for 22.219)
-  -     2024-08-25 12:10:39 2024-08-25 05:10:39.438 [main] INFO   c.d.a.DeviceHiveBackendApplication - Started DeviceHiveBackendApplication in 35.264 seconds (JVM running for 40.329)
+DeviceHive is an open-source platform for building systems to manage IoT devices, providing APIs that allow users to build components that interact with the system.
 
- - Nếu không có được kết quả Started thành công như trên thì cần Restart lại các containers hoạt động chưa đúng đó.
+CustomDeviceHive is a product built on top of DeviceHive, integrating the ability to store data and display "Temperature" and "Humidity" parameters collected from the ESP8266 board and DHT11 sensor.
 
+## Features
 
-2. Admin Console CustomDeviceHive:
-  - Truy cập URL: http://localhost/admin và tiến hành đăng nhập với name **dhadmin** và password **dhadmin_#911**
-  - Sau khi login thành công sẽ vào được trang quản lí của Admin.
-  - Vì CustomDeviceHive là 1 sản phẩm con nên cần tạo 1 User Backend để hệ thống có thể hoạt động tốt:
-    + Sang tab Users và chọn Add new user với các thông tin:
-    + name: **backend**
-    + password: **backend**
-    + role: **ADMIN**
+-   Based on the robust and open-source DeviceHive platform.
+-   Collects and stores temperature and humidity data.
+-   Visualizes data using Grafana.
 
-  3. DeviceHive cung cấp các API swagger để có thể tương tác với hệ thống:
-     -  Frontend Swagger:	http://hostname/api/swagger
-     -  Auth Swagger:	http://hostname/auth/swagger
-     -  Plugin Swagger:	http://hostname/plugin/swagger
-    
-  4. Nhúng Code ESP8266-FIRMWARE và thiết lập các cấu hình cần thiết. Sau đó kết nối Sensor DHT11 và gửi dữ liệu lên CustomDeviceHive.
-  5. Sử dụng http://localhost/grafana để truy cập Dashboard và sử dụng các câu lệnh truy vấn để xem dữ liệu:
-```sql
-SELECT s.timestamp AS "time", 
-       CONCAT(d.name, ' - ', 'temperature') AS metric, 
-       s.temperature AS value
-FROM sensor_data AS s
-INNER JOIN device AS d ON s.device_name = d.name  -- Join on the correct foreign key relationship
+## Prerequisites
 
-UNION ALL
+-   Docker
+-   Docker Compose
+-   Arduino IDE or PlatformIO for flashing the ESP8266.
 
-SELECT s.timestamp AS "time", 
-       CONCAT(d.name, ' - ', 'humidity') AS metric, 
-       s.humidity AS value
-FROM sensor_data AS s
-INNER JOIN device AS d ON s.device_name = d.name;  -- Join on the correct foreign key relationship
-```
+## Installation
 
+1.  **Build the system:**
+    To build the CustomDeviceHive system, use the following command:
+    ```bash
+    docker-compose -f docker-compose.yml --profile all up -d
+    ```
 
-Đây là sản phẩm được xây dựng dựa trên DeviceHive, vì vậy không thể tránh khỏi một số lỗi phát sinh trong quá trình sử dụng.
+2.  **Verify container status:**
+    After pulling the images and successfully building the containers, check if the containers are running by viewing the logs of containers like `dh_frontend`, `dh_backend`, `dh_auth`, etc.
 
-Nếu bạn gặp bất kỳ vấn đề nào hoặc có thắc mắc, hãy liên hệ với tôi qua email: [nhnt205@gmail.com](mailto:nhnt205@gmail.com).
+    You should see messages indicating that the applications have started successfully:
+    ```
+    2024-08-25 05:11:30.532 [main] INFO   c.d.a.DeviceHiveAuthApplication - Started DeviceHiveAuthApplication in 52.875 seconds (JVM running for 56.107)
+    2024-08-25 05:12:16.594 [main] INFO   c.d.a.DeviceHiveFrontendApplication - Started DeviceHiveFrontendApplication in 20.922 seconds (JVM running for 22.219)
+    2024-08-25 05:10:39.438 [main] INFO   c.d.a.DeviceHiveBackendApplication - Started DeviceHiveBackendApplication in 35.264 seconds (JVM running for 40.329)
+    ```
+    If you do not see these "Started" messages, you may need to restart the containers that are not running correctly.
 
-Chúc bạn sử dụng vui vẻ!
+## Usage
+
+1.  **Access the Admin Console:**
+    -   Go to `http://localhost/admin`
+    -   Log in with the following credentials:
+        -   **Username:** `dhadmin`
+        -   **Password:** `dhadmin_#911`
+
+2.  **Create a Backend User:**
+    Since CustomDeviceHive is a sub-product, you need to create a backend user for the system to function correctly.
+    -   Navigate to the **Users** tab.
+    -   Click **Add new user** with the following information:
+        -   **Username:** `backend`
+        -   **Password:** `backend`
+        -   **Role:** `ADMIN`
+
+3.  **DeviceHive APIs:**
+    DeviceHive provides Swagger APIs to interact with the system:
+    -   **Frontend Swagger:** `http://hostname/api/swagger`
+    -   **Auth Swagger:** `http://hostname/auth/swagger`
+    -   **Plugin Swagger:** `http://hostname/plugin/swagger`
+
+4.  **Configure and Flash ESP8266 Firmware:**
+    -   Open the `ESP8266_FIRMWARE/ESP8266_FIRMWARE.ino` file in your preferred editor (like Arduino IDE).
+    -   Update the following variables with your specific settings:
+        -   `ssid`: Your WiFi network name.
+        -   `password`: Your WiFi password.
+        -   `mqtt_server`: The IP address of the computer running the Docker containers.
+    -   The `device_id` variable in the `.ino` file corresponds to a device in DeviceHive. You can leave it as the default or change it to a new ID. If you change it, you will need to create a corresponding device in the DeviceHive admin console.
+    -   Connect your DHT11 sensor to the D1 pin on the ESP8266.
+    -   Upload (flash) the code to your ESP8266 board.
+
+5.  **Visualize Data in Grafana:**
+    -   Access the Grafana dashboard at `http://localhost/grafana`.
+    -   Use the following SQL query to view the data:
+        ```sql
+        SELECT
+          s.timestamp AS "time",
+          CONCAT(d.name, ' - ', 'temperature') AS metric,
+          s.temperature AS value
+        FROM sensor_data AS s
+        INNER JOIN device AS d ON s.device_name = d.name
+
+        UNION ALL
+
+        SELECT
+          s.timestamp AS "time",
+          CONCAT(d.name, ' - ', 'humidity') AS metric,
+          s.humidity AS value
+        FROM sensor_data AS s
+        INNER JOIN device AS d ON s.device_name = d.name;
+        ```
+
+## Troubleshooting and Support
+
+This product is built on DeviceHive, so some issues may arise during use.
+
+If you encounter any problems or have questions, please contact me via email: [nhnt205@gmail.com](mailto:nhnt205@gmail.com).
+
+Happy using!
